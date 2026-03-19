@@ -34,6 +34,9 @@ processed/
 # macOS
 .DS_Store
 
+#batches
+*.jsonl
+
 # Logs
 *.log
 logs/

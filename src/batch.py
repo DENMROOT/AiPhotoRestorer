@@ -1,11 +1,11 @@
 from pathlib import Path
-from typing import Generator
+from typing import Generator, Union
 
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp", ".webp"}
 
 
 def iter_batches(
-    input_dir: str | Path,
+    input_dir: Union[str, Path],
     batch_size: int,
     processed_names: set[str],
 ) -> Generator[list[Path], None, None]:

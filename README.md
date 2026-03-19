@@ -1,4 +1,4 @@
-# Photo Restorer
+# AiPhotoRestorer
 
 Batch photo restoration tool using the Google Gemini image editing API.
 
@@ -141,4 +141,3 @@ photoRestorer/
     ├── resizer.py       # standalone resize phase (presets + longest-edge)
     └── tracker.py       # SQLite progress tracker
 ```
-# AiPhotoRestorer

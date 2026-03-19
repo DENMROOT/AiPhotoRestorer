@@ -4,6 +4,7 @@ import json
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 import requests
 from google import genai
@@ -94,7 +95,7 @@ class BatchJob:
         size = len(content)
         console.print(f"Uploading request file ({size / 1024 / 1024:.1f} MB) to Gemini File API...")
 
-        last_error: Exception | None = None
+        last_error: Optional[Exception] = None
         for attempt in range(1, retries + 1):
             if attempt > 1:
                 wait = 5 * attempt

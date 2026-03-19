@@ -1,6 +1,7 @@
 import base64
 import io
 from pathlib import Path
+from typing import Optional
 
 from google import genai
 from google.genai import types
@@ -36,7 +37,7 @@ class PhotoProcessor:
         self._retry_attempts = config["rate_limit"]["retry_attempts"]
         self._retry_wait = config["rate_limit"]["retry_wait_seconds"]
 
-    def process(self, photo_path: Path, output_dir: Path) -> Path | None:
+    def process(self, photo_path: Path, output_dir: Path) -> Optional[Path]:
         """Resize, restore via Gemini, and save result. Returns output path or None on failure."""
         try:
             result = self._run(photo_path, output_dir)
