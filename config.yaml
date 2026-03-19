@@ -1,0 +1,55 @@
+# Gemini model to use for image restoration
+model: "gemini-3-pro-image-preview"
+
+# Number of photos to process in each batch
+batch_size: 5
+
+# Output image settings
+output:
+  format: "JPEG"          # JPEG or PNG
+  quality: 90             # JPEG quality 1-100
+  max_width: 4096         # Safety cap before sending to API — set to match your resize size
+  max_height: 4096
+  image_size: "4K"        # Requested output resolution: "1K", "2K", "4K" (gemini-3-pro-image-preview only)
+
+# Pre-processing resize phase (input/ → resized/ → AI → processed/)
+resize:
+  size: "4k"       # preset (4k/2k/fhd/hd) or pixel count; override with --size
+  quality: 100       # higher than output.quality — no AI re-compression yet
+  format: "JPEG"
+  output_dir: "resized"
+
+# Batch API settings (used by `python main.py batch`)
+# 50% cheaper than real-time, async — jobs may take up to 24h
+batch:
+  job_size: 10                # photos per batch job; large sets are split into multiple jobs
+  poll_interval_seconds: 60   # how often to check job status while waiting
+
+# Rate limiting (used by `python main.py run` only)
+rate_limit:
+  requests_per_minute: 10
+  retry_attempts: 3
+  retry_wait_seconds: 60
+
+# Restoration prompt — edit this to tune AI behaviour
+prompt: |
+  You are a photo technician fixing physical defects in a scanned photograph.
+  Your task is ONLY to correct technical scanning and aging artifacts.
+
+  STRICT RULES — violating any of these is unacceptable:
+  - Every person must be IDENTICAL in identity to the original: same face, same skin tone, same hair color and style, same body, same ethnicity. Do NOT alter, enhance, or regenerate any person.
+  - Do NOT replace, reinterpret, or "improve" any face or body under any circumstances.
+  - Do NOT add, remove, or move anything in the scene.
+  - Do NOT change the mood, style, or era of the photo.
+  - Do NOT change any texts from the original photo.
+  - Do NOT creatively recolor anything — only neutralize technical color defects.
+
+  ONLY fix these technical defects:
+  - Remove physical scratches, dust spots, and tears on the print surface
+  - Correct color cast from aged film or scanner bias (e.g. red/pink/yellow tint over the whole image)
+  - Restore faded or desaturated colors to what they naturally would have been
+  - Recover lost shadow/highlight detail from uneven exposure
+  - Sharpen only genuine blur caused by the scanning process
+
+  Think of this as cleaning a dirty glass over a painting — the painting itself must not change.
+  Output only the corrected image, no text.
