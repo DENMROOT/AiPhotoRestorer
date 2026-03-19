@@ -32,6 +32,15 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS batch_queued (
+                filename TEXT PRIMARY KEY,
+                job_name TEXT,
+                queued_at TEXT DEFAULT (datetime('now'))
+            )
+            """
+        )
 
 
 def save_batch_job(job_name: str) -> None:
@@ -54,6 +63,29 @@ def list_batch_jobs() -> list[dict]:
             "SELECT job_name, submitted_at, status FROM batch_jobs ORDER BY submitted_at DESC"
         ).fetchall()
     return [{"job_name": r[0], "submitted_at": r[1], "status": r[2]} for r in rows]
+
+
+def mark_queued(filenames: list, job_name: str) -> None:
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.executemany(
+            "INSERT OR IGNORE INTO batch_queued (filename, job_name) VALUES (?, ?)",
+            [(f, job_name) for f in filenames],
+        )
+
+
+def get_queued() -> set:
+    """Returns filenames queued in a batch job but not yet processed."""
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute(
+            "SELECT filename FROM batch_queued "
+            "WHERE filename NOT IN (SELECT filename FROM processed)"
+        ).fetchall()
+    return {row[0] for row in rows}
+
+
+def clear_queued() -> None:
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM batch_queued")
 
 
 def clear_processed() -> None:

@@ -21,6 +21,9 @@ from src.tracker import (
     mark_resized,
     get_resized,
     clear_resized,
+    mark_queued,
+    get_queued,
+    clear_queued,
 )
 from src.processor import PhotoProcessor
 from src.batch_job import BatchJob, TERMINAL_STATES
@@ -245,52 +248,70 @@ def batch(
 
     if force:
         clear_processed()
+        clear_queued()
         console.print("[yellow]Progress reset — all photos will be re-processed.[/yellow]")
 
     processed = get_processed()
+    queued = get_queued()
+
     all_photos = [
         p for batch_group in iter_batches(input_dir, 9999, processed)
         for p in batch_group
     ]
 
-    if not all_photos:
+    if not all_photos and not queued:
         console.print("[green]Nothing to process — all photos are already done.[/green]")
         raise typer.Exit()
 
-    job_size = config.get("batch", {}).get("job_size", 20)
-    chunks = [all_photos[i:i + job_size] for i in range(0, len(all_photos), job_size)]
-    poll_interval = config.get("batch", {}).get("poll_interval_seconds", 60)
+    # Photos not yet submitted to any job
+    unsubmitted = [p for p in all_photos if p.name not in queued]
 
+    # Pending jobs already submitted in a previous run
+    pending_jobs = [
+        row["job_name"] for row in list_batch_jobs()
+        if row["status"] == "pending"
+    ]
+
+    job_size = config.get("batch", {}).get("job_size", 20)
+    poll_interval = config.get("batch", {}).get("poll_interval_seconds", 60)
+    new_chunks = [unsubmitted[i:i + job_size] for i in range(0, len(unsubmitted), job_size)]
+
+    console.print(f"Input: [dim]{input_dir}/[/dim]")
     console.print(
-        f"Found [bold]{len(all_photos)}[/bold] photo(s) → "
-        f"[bold]{len(chunks)}[/bold] job(s) of up to {job_size} each.  "
-        f"Input: [dim]{input_dir}/[/dim]"
+        f"  [dim]{len(processed)} processed, "
+        f"{len(queued)} queued in {len(pending_jobs)} existing job(s), "
+        f"{len(unsubmitted)} new → {len(new_chunks)} new job(s)[/dim]"
     )
 
     job = BatchJob(config, settings.gemini_api_key)
-    submitted_jobs: list[str] = []
+    new_jobs: list[str] = []
 
-    for i, chunk in enumerate(chunks, 1):
-        console.print(f"\n[bold]Job {i}/{len(chunks)}[/bold] — {len(chunk)} photo(s)")
+    for i, chunk in enumerate(new_chunks, 1):
+        console.print(f"\n[bold]New job {i}/{len(new_chunks)}[/bold] — {len(chunk)} photo(s)")
         jsonl_path = job.prepare_jsonl(chunk, filename=f"batch_input_{i}.jsonl")
         file_name = job.upload(jsonl_path)
         job_name = job.submit(file_name)
         save_batch_job(job_name)
-        submitted_jobs.append(job_name)
+        mark_queued([p.name for p in chunk], job_name)
+        new_jobs.append(job_name)
 
-    console.print(f"\nSubmitted [bold]{len(submitted_jobs)}[/bold] job(s).")
+    all_jobs = pending_jobs + new_jobs
+    console.print(
+        f"\nPolling [bold]{len(all_jobs)}[/bold] job(s) total "
+        f"({len(pending_jobs)} existing + {len(new_jobs)} new)."
+    )
 
     if no_wait:
         console.print("Exiting without waiting. Collect each job when ready:")
-        for jn in submitted_jobs:
+        for jn in all_jobs:
             console.print(f"  python3 main.py collect [cyan]{jn}[/cyan]")
         raise typer.Exit()
 
     try:
-        _poll_jobs_until_done(job, submitted_jobs, output_dir, poll_interval)
+        _poll_jobs_until_done(job, all_jobs, output_dir, poll_interval)
     except KeyboardInterrupt:
         console.print("\nInterrupted. Collect remaining jobs with:")
-        for jn in submitted_jobs:
+        for jn in all_jobs:
             console.print(f"  python3 main.py collect [cyan]{jn}[/cyan]")
         raise typer.Exit()
 
